@@ -69,10 +69,17 @@ rm .a-test
 }
 
 [ -d "/etc/trinity" ] && TDESYSCONFDIR="/etc/trinity"
-[ -d "/etc/tde" ] && TDESYSCONFDIR="/etc/tde"
+[ -d "/etc/tde" ]     && TDESYSCONFDIR="/etc/tde"
 read -p "TDE configuration directory? [$TDESYSCONFDIR] " TDESYSCONFDIR_OVERRIDE
 [ -n "$TDESYSCONFDIR_OVERRIDE" ] && TDESYSCONFDIR=$TDESYSCONFDIR_OVERRIDE
 
+[[ -d $TDEPREFIX/lib/trinity || -d $TDEPREFIX/lib64/trinity ]] && TDELIBDIRNAME=trinity
+[[ -d $TDEPREFIX/lib/tde     || -d $TDEPREFIX/lib64/tde     ]] && TDELIBDIRNAME=tde
+[ -n "$TDELIBDIRNAME" ] || {
+	echo "+ TDE libraries path not found!"
+	echo "  usually they are located in a 'trinity' directory under libraries path."
+	exit 3
+}
 
 [ -d $SRCDIR ] || {
 	echo "+ Error: directory does not exist!"
@@ -226,6 +233,15 @@ echo "- Configuring SlackBuild"
 			AUTOFLAGS+="--enable-debug"
 			echo -e "  - Autotools build type:\twith debugging symbols";;
 	esac
+
+	# Library directory name hack
+	[ $TDELIBDIRNAME == "trinity" ] || {
+		LIBDIRNAMEHACK="
+# Library directory hack
+sed -i 's:\(\${libdir}/\)trinity:\1$TDELIBDIRNAME:g' admin/acinclude.m4.in
+sed -i 's:trinity\(/plugins/designer\):$TDELIBDIRNAME\1:g' admin/acinclude.m4.in
+"
+	}
 }
 
 cd $CWD ; unset CWD
@@ -329,6 +345,7 @@ EOF
 	;;
 	"Autotools") # CHECKME: TQTDIR
 		cat >> $SLKBUILD << EOF
+$LIBDIRNAMEHACK
 cp -Rp /usr/share/aclocal/libtool.m4 admin/libtool.m4.in
 cp -Rp /usr/share/libtool/build-aux/ltmain.sh admin/ltmain.sh
 make -f admin/Makefile.common || exit \$?
